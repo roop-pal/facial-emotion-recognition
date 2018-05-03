@@ -1,7 +1,7 @@
 import csv
 
 def parser():
-    csvr = csv.reader(open('fer2013.csv'))
+    csvr = csv.reader(open('../fer2013.csv'))
     header = next(csvr)
     rows = [row for row in csvr]
     
