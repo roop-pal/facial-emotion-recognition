@@ -32,12 +32,12 @@ def eval_input_fn(features, labels, batch_size):
     return dataset
 
 def main(argv):
-    steps = 1
-    batch_size = 19
+    steps = 5000
+    batch_size = 28709
     
     emotions = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
     
-#     fer2013.parser('../fer2013.csv')
+    # fer2013.parser('../fer2013.csv')
 
     train_x, train_y, test_x, test_y = fer2013.load_data()
     print(train_x.shape)
@@ -51,13 +51,16 @@ def main(argv):
         hidden_units=[10, 10],
         n_classes=7)
 
+    s = time()
     classifier.train(
         input_fn=lambda:train_input_fn({'img':train_x}, train_y, batch_size),
         steps=steps)
+    e = time() - s
     
     eval_result = classifier.evaluate(input_fn=lambda:eval_input_fn({'img':test_x}, test_y, batch_size))
 
     print('\nTest set accuracy: {accuracy:0.3f}\n'.format(**eval_result))
+    print('Evaluated in {} seconds\n'.format(round(e,2)))
 
 if __name__ == '__main__':
     tf.logging.set_verbosity(tf.logging.INFO)
