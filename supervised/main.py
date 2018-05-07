@@ -5,10 +5,51 @@ from time import time
 import tensorflow as tf
 import fer2013 
 import sys
-sys.path.insert(0, '../deterministic')
-import deterministic_emotion_recognition as der
-import dlib
+# sys.path.insert(0, '../deterministic')
+# import deterministic_emotion_recognition as der
+# import dlib
 
+def my_model(features, labels, mode, params):
+    """DNN with three hidden layers, and dropout of 0.1 probability."""
+    # Create three fully connected layers each layer having a dropout
+    # probability of 0.1.
+    net = tf.feature_column.input_layer(features, params['feature_columns'])
+    for units in params['hidden_units']:
+        net = tf.layers.dense(net, units=units, activation=tf.nn.relu)
+
+    # Compute logits (1 per class).
+    logits = tf.layers.dense(net, params['n_classes'], activation=None)
+
+    # Compute predictions.
+    predicted_classes = tf.argmax(logits, 1)
+    if mode == tf.estimator.ModeKeys.PREDICT:
+        predictions = {
+            'class_ids': predicted_classes[:, tf.newaxis],
+            'probabilities': tf.nn.softmax(logits),
+            'logits': logits,
+        }
+        return tf.estimator.EstimatorSpec(mode, predictions=predictions)
+
+    # Compute loss.
+    loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits)
+
+    # Compute evaluation metrics.
+    accuracy = tf.metrics.accuracy(labels=labels,
+                                   predictions=predicted_classes,
+                                   name='acc_op')
+    metrics = {'accuracy': accuracy}
+    tf.summary.scalar('accuracy', accuracy[1])
+
+    if mode == tf.estimator.ModeKeys.EVAL:
+        return tf.estimator.EstimatorSpec(
+            mode, loss=loss, eval_metric_ops=metrics)
+
+    # Create training op.
+    assert mode == tf.estimator.ModeKeys.TRAIN
+
+    optimizer = tf.train.AdagradOptimizer(learning_rate=0.1)
+    train_op = optimizer.minimize(loss, global_step=tf.train.get_global_step())
+    return tf.estimator.EstimatorSpec(mode, loss=loss, train_op=train_op)
 
 def train_input_fn(features, labels, batch_size):
     # Convert the inputs to a Dataset.
@@ -37,25 +78,32 @@ def eval_input_fn(features, labels, batch_size):
     return dataset
 
 def main(argv):
-    steps = 50000
-    batch_size = 1511
-    
+    steps = 100
+    batch_size = 19
     emotions = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
     
     fer2013.parser('../fer2013.csv')
 
     train_x, train_y, test_x, test_y = fer2013.load_data()
-    print(train_x.shape)
-    print(test_x.shape)
+
     my_feature_columns = [tf.feature_column.numeric_column(key='img',shape=[48,48,1])]
-    detector = dlib.get_frontal_face_detector()
+    # detector = dlib.get_frontal_face_detector()
     # faces = detector(image, 1)
     # Build 2 hidden layer DNN with 10, 10 units respectively.
-    classifier = tf.estimator.DNNClassifier(
-        feature_columns=my_feature_columns,
-        # Two hidden layers of 10 nodes each.
-        hidden_units=[10, 10],
-        n_classes=7)
+#     classifier = tf.estimator.DNNClassifier(
+#         feature_columns=my_feature_columns,
+#         # Two hidden layers of 10 nodes each.
+#         hidden_units=[10, 10],
+#         n_classes=7)
+
+    classifier = tf.estimator.Estimator(
+        model_fn=my_model,
+        params={
+            'feature_columns': my_feature_columns,
+            # Two hidden layers of 10 nodes each.
+            'hidden_units': [10, 10],
+            'n_classes': 7,
+        })
 
     s = time()
     classifier.train(
