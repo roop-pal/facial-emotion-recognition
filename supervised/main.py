@@ -33,7 +33,7 @@ def eval_input_fn(features, labels, batch_size):
 
 def main(argv):
     steps = 5000
-    batch_size = 28709
+    batch_size = 7178
     
     emotions = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
     
@@ -58,8 +58,10 @@ def main(argv):
     e = time() - s
     
     eval_result = classifier.evaluate(input_fn=lambda:eval_input_fn({'img':test_x}, test_y, batch_size))
+    train_result = classifier.evaluate(input_fn=lambda:eval_input_fn({'img':train_x}, train_y, batch_size))
 
-    print('\nTest set accuracy: {accuracy:0.3f}\n'.format(**eval_result))
+    print('\nTrain set accuracy: {accuracy:0.3f}'.format(**train_result))
+    print('Test set accuracy: {accuracy:0.3f}\n'.format(**eval_result))
     print('Evaluated in {} seconds\n'.format(round(e,2)))
 
 if __name__ == '__main__':
