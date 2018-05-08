@@ -167,6 +167,7 @@ def my_alexnet(features, labels, mode, params):
                                    predictions=predicted_classes,
                                    name='acc_op')
     
+    print('Accuracy',accuracy)
     metrics = {'accuracy': accuracy}
     tf.summary.scalar('accuracy', accuracy[1])
     
@@ -177,6 +178,6 @@ def my_alexnet(features, labels, mode, params):
     assert mode == tf.estimator.ModeKeys.TRAIN
             
     train_op = tf.contrib.layers.optimize_loss(
-        loss, tf.contrib.framework.get_global_step(), optimizer='Momentum', learning_rate=0.1)
+        loss, tf.contrib.framework.get_global_step(), optimizer='Momentum', learning_rate=0.001)
     
     return tf.estimator.EstimatorSpec(mode,loss=loss,train_op=train_op)

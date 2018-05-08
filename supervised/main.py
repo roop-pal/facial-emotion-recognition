@@ -76,7 +76,7 @@ def my_model(features, labels, mode, params):
     return tf.estimator.EstimatorSpec(mode, loss=loss, train_op=train_op)
 
 def main(argv):
-    steps = 50000
+    steps = 20000
     batch_size = 50
     emotions = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
     
