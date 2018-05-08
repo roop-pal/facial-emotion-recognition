@@ -84,7 +84,7 @@ def main(argv):
     batch_size = 19
     emotions = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
     
-    # fer2013.parser('../fer2013.csv')
+    fer2013.parser('../fer2013.csv')
 
     train_x, train_y, test_x, test_y = fer2013.load_data()
 
