@@ -123,12 +123,6 @@ def classify(img):
         num_epochs=1,
         shuffle=False)
     output = list(classifier.predict(input_fn=predict_input_fn))
-    batch_size = 50
-    _,_,test_x,test_y = fer2013.load_data()
-    test_x, test_y = test_x[:-(len(test_x) % batch_size)], test_y[:-(len(test_y) % batch_size)]
-    eval_result = classifier.evaluate(input_fn=lambda:eval_input_fn({'img':test_x},test_y,batch_size))
-    print("\nrsult",eval_result)
-    print(output[0]["class_ids"])
     return output[0]["class_ids"]
 
 if __name__ == '__main__':
