@@ -115,3 +115,66 @@ def alexnet_model(features, labels, mode, params):
         learning_rate=0.1)
     
     return tf.estimator.EstimatorSpec(mode,loss=loss,train_op=train_op)
+
+
+def my_alexnet(features, labels, mode, params):
+    training = False
+    if mode == tf.estimator.ModeKeys.TRAIN:
+        training = True
+        
+    net = tf.feature_column.input_layer(features, params['feature_columns'])
+    net = tf.reshape(net, (params['batch_size'], 48, 48, 1))
+    conv = tf.contrib.layers.convolution2d(net,
+                                           num_outputs=64,
+                                           kernel_size=[5,5],
+                                           stride=1,
+                                           activation_fn=tf.nn.relu,
+                                           padding='SAME')
+    norm = tf.nn.local_response_normalization(conv)
+    pool = tf.nn.max_pool(norm, ksize=(1,3,3,1), strides=(1,2,2,1), padding='SAME')
+    conv = tf.contrib.layers.convolution2d(pool,
+                                           num_outputs=64,
+                                           kernel_size=[5,5],
+                                           stride=1,
+                                           activation_fn=tf.nn.relu,
+                                           padding='SAME')
+    pool = tf.nn.max_pool(conv, ksize=(1,3,3,1), strides=(1,2,2,1), padding='SAME')
+    conv = tf.contrib.layers.convolution2d(pool,
+                                           num_outputs=128,
+                                           kernel_size=[4,4],
+                                           stride=1,
+                                           activation_fn=tf.nn.relu,
+                                           padding='SAME')
+    conv_flat = flatten_convolution(conv)
+    dropout = tf.contrib.layers.dropout(conv_flat, keep_prob=0.3, is_training=training)
+    net = tf.contrib.layers.fully_connected(dropout, 3072)
+    logits = tf.contrib.layers.fully_connected(net, params['n_classes'])
+    
+    predicted_classes = tf.argmax(logits, 1)
+    
+    if mode == tf.estimator.ModeKeys.PREDICT:
+        predictions = {
+            'class_ids': predicted_classes[:, tf.newaxis],
+            'probabilities': tf.nn.softmax(logits),
+            'logits': logits,
+        }
+        return tf.estimator.EstimatorSpec(mode, predictions=predictions)
+    
+    loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits)    
+    accuracy = tf.metrics.accuracy(labels=labels,
+                                   predictions=predicted_classes,
+                                   name='acc_op')
+    
+    metrics = {'accuracy': accuracy}
+    tf.summary.scalar('accuracy', accuracy[1])
+    
+    if mode == tf.estimator.ModeKeys.EVAL:
+        return tf.estimator.EstimatorSpec(
+            mode, loss=loss, eval_metric_ops=metrics)
+        
+    assert mode == tf.estimator.ModeKeys.TRAIN
+            
+    train_op = tf.contrib.layers.optimize_loss(
+        loss, tf.contrib.framework.get_global_step(), optimizer='Momentum', learning_rate=0.1)
+    
+    return tf.estimator.EstimatorSpec(mode,loss=loss,train_op=train_op)
