@@ -130,7 +130,8 @@ def my_alexnet(features, labels, mode, params):
                                            stride=1,
                                            activation_fn=tf.nn.relu,
                                            padding='SAME')
-    pool = tf.nn.max_pool(conv, ksize=(1,3,3,1), strides=(1,2,2,1), padding='SAME')
+    norm = tf.nn.local_response_normalization(conv)
+    pool = tf.nn.max_pool(norm, ksize=(1,3,3,1), strides=(1,2,2,1), padding='SAME')
     conv = tf.contrib.layers.convolution2d(pool,
                                            num_outputs=64,
                                            kernel_size=[5,5],
@@ -145,9 +146,6 @@ def my_alexnet(features, labels, mode, params):
                                            activation_fn=tf.nn.relu,
                                            padding='SAME')
     conv_flat = flatten_convolution(conv)
-#     dropout = tf.layers.dropout(conv_flat, rate=0.3, training=training)
-#     net = tf.layers.dense(dropout, 3072)
-#     logits = tf.layers.dense(net, params['n_classes'])
     dropout = tf.contrib.layers.dropout(conv_flat, keep_prob=0.3, is_training=training)
     net = tf.contrib.layers.fully_connected(dropout, 3072)
     logits = tf.contrib.layers.fully_connected(net, params['n_classes'])
