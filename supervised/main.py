@@ -76,14 +76,15 @@ def my_model(features, labels, mode, params):
     return tf.estimator.EstimatorSpec(mode, loss=loss, train_op=train_op)
 
 def main(argv):
-    steps = 100
-    batch_size = 19
+    steps = 50000
+    batch_size = 50
     emotions = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
     
-    fer2013.parser('../fer2013.csv')
+    # fer2013.parser('../fer2013.csv')
 
     train_x, train_y, test_x, test_y = fer2013.load_data()
     # if alexnet, make sure length of sets is divisible by batch_size
+    train_x, train_y = train_x[:-(len(train_x) % batch_size)], train_y[:-(len(train_y) % batch_size)]
     test_x, test_y = test_x[:-(len(test_x) % batch_size)], test_y[:-(len(test_y) % batch_size)]
 
     my_feature_columns = [tf.feature_column.numeric_column(key='img',shape=[48,48,1])]
