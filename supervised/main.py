@@ -5,6 +5,7 @@ from time import time
 import tensorflow as tf
 import fer2013 
 import sys
+import pickle
 
 def train_input_fn(features, labels, batch_size):
     # Convert the inputs to a Dataset.
@@ -76,7 +77,7 @@ def my_model(features, labels, mode, params):
     return tf.estimator.EstimatorSpec(mode, loss=loss, train_op=train_op)
 
 def main(argv):
-    steps = 50000
+    steps = 35000
     batch_size = 50
     emotions = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
     
@@ -88,12 +89,6 @@ def main(argv):
     test_x, test_y = test_x[:-(len(test_x) % batch_size)], test_y[:-(len(test_y) % batch_size)]
 
     my_feature_columns = [tf.feature_column.numeric_column(key='img',shape=[48,48,1])]
-    # Build 2 hidden layer DNN with 10, 10 units respectively.
-#     classifier = tf.estimator.DNNClassifier(
-#         feature_columns=my_feature_columns,
-#         # Two hidden layers of 10 nodes each.
-#         hidden_units=[10, 10],
-#         n_classes=7)
 
     classifier = tf.estimator.Estimator(
         model_fn=alexnet.my_alexnet,
@@ -109,6 +104,8 @@ def main(argv):
         steps=steps)
     t = time() - s
     
+    pickle.dump(classifier,open('model.p','wb'))
+
     s = time()
     train_result = classifier.evaluate(input_fn=lambda:eval_input_fn({'img':train_x}, train_y, batch_size))
     eval_result = classifier.evaluate(input_fn=lambda:eval_input_fn({'img':test_x}, test_y, batch_size))
@@ -118,6 +115,16 @@ def main(argv):
     print('Test set accuracy: {accuracy:0.3f}\n'.format(**eval_result))
     print('Trained in {} seconds'.format(round(t,2)))
     print('Evaluated in {} seconds\n'.format(round(e,2)))
+
+def classify(img):
+    classifier = pickle.load(open('model.p','rb'))
+    predict_input_fn = tf.estimator.inputs.numpy_input_fn(
+        x={"x": new_samples},
+        num_epochs=1,
+        shuffle=False)
+    output = list(classifier.predict(input_fn=predict_input_fn))
+    print(output["classes"])
+    return output["classes"]
 
 if __name__ == '__main__':
     tf.logging.set_verbosity(tf.logging.INFO)
