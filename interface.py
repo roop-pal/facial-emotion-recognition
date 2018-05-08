@@ -10,90 +10,92 @@ import statistics
 import sys
 sys.path.insert(0, "./deterministic")
 from measured_values import *
+sys.path.insert(0, "./unsupervised")
+from unsupervised_classify import UnsupervisedClassification
 from math import sqrt
 
 
 def dist(point1, point2):
-    """
-    return distance between two points
-    """
-    (x1, y1) = point1
-    (x2, y2) = point2
-    return sqrt((x2 - x1)**2 + (y2 - y1)**2)
+	"""
+	return distance between two points
+	"""
+	(x1, y1) = point1
+	(x2, y2) = point2
+	return sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
 
 def N_dist(landmarks):
-    """
-    calculate vertical distance between irises (N)
-    this is used to normalize the characteristic facial distances
-    """
-    temp1 = dist(landmarks[37], landmarks[43])
-    temp2 = dist(landmarks[38], landmarks[44])
-    temp3 = dist(landmarks[41], landmarks[47])
-    temp4 = dist(landmarks[40], landmarks[46])
-    N = (temp1 + temp2 + temp3 + temp4) / 4
-    #print(temp1, temp2, temp3, temp4, N)
-    return N
+	"""
+	calculate vertical distance between irises (N)
+	this is used to normalize the characteristic facial distances
+	"""
+	temp1 = dist(landmarks[37], landmarks[43])
+	temp2 = dist(landmarks[38], landmarks[44])
+	temp3 = dist(landmarks[41], landmarks[47])
+	temp4 = dist(landmarks[40], landmarks[46])
+	N = (temp1 + temp2 + temp3 + temp4) / 4
+	#print(temp1, temp2, temp3, temp4, N)
+	return N
 
 
 def D1_dist(landmarks, N):
-    """
-    D1 Eye opening, distance between upper and lower eyelids.
-    """
-    temp1 = dist(landmarks[37], landmarks[41]) / N
-    temp2 = dist(landmarks[38], landmarks[40]) / N
-    temp3 = dist(landmarks[43], landmarks[47]) / N
-    temp4 = dist(landmarks[44], landmarks[46]) / N
-    D1 = (temp1 + temp2 + temp3 + temp4) / 4
-    #print(temp1, temp2, temp3, temp4, D1)
-    return D1
+	"""
+	D1 Eye opening, distance between upper and lower eyelids.
+	"""
+	temp1 = dist(landmarks[37], landmarks[41]) / N
+	temp2 = dist(landmarks[38], landmarks[40]) / N
+	temp3 = dist(landmarks[43], landmarks[47]) / N
+	temp4 = dist(landmarks[44], landmarks[46]) / N
+	D1 = (temp1 + temp2 + temp3 + temp4) / 4
+	#print(temp1, temp2, temp3, temp4, D1)
+	return D1
 
 
 def D2_dist(landmarks, N):
-    """
-    D2 Distance between the interior corner of the eye and 
-    the interior corner of the eyebrow.
-    """
-    temp1 = dist(landmarks[21], landmarks[22]) / N
-    temp2 = dist(landmarks[39], landmarks[42]) / N
-    D2 = (temp1 + temp2) / 2
-    #print(temp1, temp2, D2)
-    return D2
+	"""
+	D2 Distance between the interior corner of the eye and
+	the interior corner of the eyebrow.
+	"""
+	temp1 = dist(landmarks[21], landmarks[22]) / N
+	temp2 = dist(landmarks[39], landmarks[42]) / N
+	D2 = (temp1 + temp2) / 2
+	#print(temp1, temp2, D2)
+	return D2
 
 
 def D3_dist(landmarks, N):
-    """
-    D3 Mouth opening width, distance between 
-    left and right mouth corners 
-    """
-    D3 = dist(landmarks[48], landmarks[54]) / N
-    # print(D3)
-    return D3
+	"""
+	D3 Mouth opening width, distance between
+	left and right mouth corners
+	"""
+	D3 = dist(landmarks[48], landmarks[54]) / N
+	# print(D3)
+	return D3
 
 
 def D4_dist(landmarks, N):
-    """
-    D4 Mouth opening height, distance between upper and lower lips.
-    """
-    D4 = dist(landmarks[62], landmarks[66]) / N
-    #print(temp1, D4)
-    return D4
+	"""
+	D4 Mouth opening height, distance between upper and lower lips.
+	"""
+	D4 = dist(landmarks[62], landmarks[66]) / N
+	#print(temp1, D4)
+	return D4
 
 
 def D5_dist(landmarks, N):
-    """
-    D5 Distance between a corner of the mouth 
-    and the corresponding external eye corner.
-    """
-    temp1 = dist(landmarks[36], landmarks[48]) / N
-    temp2 = dist(landmarks[45], landmarks[54]) / N
-    D5 = (temp1 + temp2) / 2
-    #print(temp1, temp2, D5)
-    return D5
+	"""
+	D5 Distance between a corner of the mouth
+	and the corresponding external eye corner.
+	"""
+	temp1 = dist(landmarks[36], landmarks[48]) / N
+	temp2 = dist(landmarks[45], landmarks[54]) / N
+	D5 = (temp1 + temp2) / 2
+	#print(temp1, temp2, D5)
+	return D5
 
 def shape_to_np(shape, dtype="int"):
 	"""
-	convert dlib shape to np array 
+	convert dlib shape to np array
 	initialize the list of (x, y)-coordinates
 	"""
 	coords = np.zeros((68, 2), dtype=dtype)
@@ -104,6 +106,18 @@ def shape_to_np(shape, dtype="int"):
 		coords[i] = (shape.part(i).x, shape.part(i).y)
 
 	return coords
+
+def rect_to_bb(rect):
+	# take a bounding predicted by dlib and convert it
+	# to the format (x, y, w, h) as we would normally do
+	# with OpenCV
+	x = rect.left()
+	y = rect.top()
+	w = rect.right() - x
+	h = rect.bottom() - y
+
+	# return a tuple of (x, y, w, h)
+	return (x, y, w, h)
 
 # Load facial predictor
 print("[INFO] loading facial landmark predictor...")
@@ -119,6 +133,7 @@ img_counter = 0
 
 emotions = ["Anger", "Disgust", "Fear",
 				"Joy", "Sadness", "Surprise", "Neutral"]
+
 
 while True:
 	# get frame, resize it, and convert it to gray
@@ -145,11 +160,21 @@ while True:
 	landmarks = predictor(frame, faces)
 	landmarks = shape_to_np(landmarks)
 
+	# get bounding box of face
+	(x, y, w, h) = face_utils.rect_to_bb(faces)
+	im = frame[ y:y+h , x: x + w ]
+	im = imutils.resize(im, width=48)
+	print(im.shape)
+
+	u = UnsupervisedClassification()
+	u_score = u.label_image(im)
+
+	print("ANA's SCORE ", u_score)
 	#loop over the (x, y)-coordinates for the facial landmarks
 	# and draw them on the image
 	for (x, y) in landmarks:
 		cv2.circle(frame, (x, y), 2, (0, 0, 255), -1)
-	
+
 	# calculate vertical distance between irises (N)
 	# this is used to normalize the characteristic facial distances
 	N = N_dist(landmarks)
@@ -176,7 +201,7 @@ while True:
 	# Calculate confidence scores of each emotion
 	confidence = []
 
-	# Certain characterictic distances seem to matter more, 
+	# Certain characterictic distances seem to matter more,
 	# therefore give them different weights if influence = True
 	influence = True
 	if influence is True:
@@ -192,7 +217,7 @@ while True:
 		dd = 1
 		ee = 1
 
-	# Calculate confidence percentage based on how far each 
+	# Calculate confidence percentage based on how far each
 	# characteristic distance is from the calculate average distances
 	# for each emotion
 	C1 = 1 - abs(AVG_D1_Anger - D1)
@@ -229,7 +254,7 @@ while True:
 	C4 = 1 - abs(AVG_D4_Sadness - D4)
 	C5 = 1 - abs(AVG_D5_Sadness - D5)
 	confidence.append(sum([aa * C1, bb * C2, cc * C3, dd * C4, ee * C5]))
-	
+
 	C1 = 1 - abs(AVG_D1_Surprise - D1)
 	C2 = 1 - abs(AVG_D2_Surprise - D2)
 	C3 = 1 - abs(AVG_D3_Surprise - D3)
@@ -258,7 +283,7 @@ while True:
 	p2 = 0.04080891538920051
 	p3 = 0.14421632072267224
 	p4 = 0.12908862310308516
-	p5 = 0.14223306716801098 
+	p5 = 0.14223306716801098
 
 	if  L1 < -3 * p1:
 		state[0] = -2
@@ -337,22 +362,21 @@ while True:
 		emotion_guess = np.argsort(confidence)[-1]
 
 	cv2.putText(frame, emotions[emotion_guess], (50,70), cv2.FONT_HERSHEY_SIMPLEX, 4, 255)
-	
 
-	
+
+
 
 
 
 	cv2.imshow("Frame", frame)
-	
+
 	key = cv2.waitKey(1) & 0xFF
-	
+
 	if key == ord("q"):
 		break
-		
+
 	elif key %256 == 32:   # SPACE pressed
 		img_name = "opencv_frame_{}.png".format(img_counter)
 		cv2.imwrite(img_name, frame)
 		print("{} written!".format(img_name))
 		img_counter += 1
-
