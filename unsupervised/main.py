@@ -1,5 +1,3 @@
-from sklearn.metrics import classification_report
-from sklearn.neural_network import MLPClassifier
 from sklearn.datasets import load_digits
 from sklearn.metrics import accuracy_score
 from sklearn.decomposition import PCA
@@ -7,8 +5,8 @@ from sklearn.cluster import KMeans
 from scipy.stats import mode
 import matplotlib.pyplot as plt
 import numpy as np
-import math
 import csv
+
 
 #************************** Pre-processing ******************************
 # Running PCA and Whitening
@@ -22,9 +20,9 @@ def load_data():
     tst  = [row[1:-1] for row in rows if row[-1] == 'PublicTest']
     tst2 = [row[1:-1] for row in rows if row[-1] == 'PrivateTest']
 
-    trn_targets  = [row[0] for row in rows if row[-1] == 'Training']
-    tst_targets  = [row[0] for row in rows if row[-1] == 'PublicTest']
-    tst2_targets = [row[0] for row in rows if row[-1] == 'PrivateTest']
+    trn_targets  = np.array([row[0] for row in rows if row[-1] == 'Training'], int)
+    tst_targets  = np.array([row[0] for row in rows if row[-1] == 'PublicTest'], int)
+    tst2_targets = np.array([row[0] for row in rows if row[-1] == 'PrivateTest'], int)
 
     return trn, tst, tst2, trn_targets, tst_targets, tst2_targets
 
@@ -44,15 +42,15 @@ def vector_to_2d_array(data):
     nsamples, nx, ny = imgs.shape
     d2_imgs = imgs.reshape(nsamples, nx*ny)
 
-    return d2_imgs, imgs
+    return d2_imgs
 
 # pre-process training data
 def pca_and_whiten(data):
     # translate arrays to 2d
-    d2_imgs, imgs = vector_to_2d_array(data)
+    d2_imgs = vector_to_2d_array(data)
 
     # Randomized PCA with whitening -- retains image features better
-    pca = PCA(n_components=48, whiten= True, svd_solver='randomized')
+    pca = PCA(n_components=2304, whiten= True, svd_solver='randomized')
     imgs_proj = pca.fit_transform(d2_imgs)
 
     # retains 0.8427 of the variance
@@ -70,68 +68,79 @@ def pca_and_whiten(data):
 emotions = ["Angry", "Disgust", "Fear", "Joy", "Sad", "Surprise", "Neutral"]
 n = len(emotions)
 
-t1, t2, t3, trn_targets, tst_targets, tst2_targets = load_data()
+t1, t2, t3, trn_targets, tst_targets, tst2_targets = d.load_data()
 test = t2 + t3
 test_targets = list(tst_targets) + list(tst2_targets)
 # reshape to image dimensions 48 x 48
-d2_imgs, imgs       = vector_to_2d_array(t1)
-d2_t2_imgs, t2_imgs = vector_to_2d_array(test)
+d2_imgs    = vector_to_2d_array(t1)
+d2_t2_imgs = vector_to_2d_array(test)
+
+# trn  = pca_and_whiten(t1)
+# tst  = pca_and_whiten(t2)
+# tst2 = pca_and_whiten(t3)
+
+
+# print("NO PCA")
+# kmeans = KMeans(n_clusters=n, random_state=0)
+# clusters = kmeans.fit_predict(d2_imgs)
+
+# labels = np.zeros_like(clusters)
+# mask = (clusters == 0 )
+# labels[mask] = mode(trn_targets[mask])[0]
+
+# for i in range(n):
+#     mask = (clusters == i)
+#     labels[mask] = mode(trn_targets[mask])[0]
+
+# results=accuracy_score(trn_targets, labels)
+# print(results)
+
+# print("WITH PCA")
+# kmeans = KMeans(n_clusters=n, random_state=0)
+# clusters = kmeans.fit_predict(trn)
+
+# fig, ax = plt.subplots(1, n, figsize=(8, 3))
+# centers = kmeans.cluster_centers_.reshape(n, 48, 48)
+# for axi, center in zip(ax.flat, centers):
+#     axi.set(xticks=[], yticks=[])
+#     axi.imshow(center, interpolation='nearest', cmap=plt.cm.binary)
+
+
+# labels = np.zeros_like(clusters)
+# mask = (clusters == 0 )
+# labels[mask] = mode(trn_targets[mask])[0]
+
+# for i in range(n):
+#     mask = (clusters == i)
+#     labels[mask] = mode(trn_targets[mask])[0]
+
+# results=accuracy_score(trn_targets, labels)
+# print(results)
 
 # NO PCA
 # 0.2558431153993521
 # WITH PCA
 # 0.25141941551429864
 
-# change integers to strings for MLP labels
-trn_targets = np.array(trn_targets, str)
-test_targets= np.array(test_targets, str)
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import classification_report
 
 print("starting")
-# assign training set and test sets
 X_train, X_test, y_train, y_test = d2_imgs, d2_t2_imgs, trn_targets, test_targets
 
+trn_targets = np.array(trn_targets, str)
+tst_targets= np.array(test_targets, str)
 # Compute a PCA
 # reduce dimensionality to n_components
-n_components = 48
+n_components = 96
 pca = PCA(n_components=n_components, whiten=True).fit(X_train)
-
-# print ("PCA variance retained", np.cumsum(pca.explained_variance_ratio_))
+print ("post pCA")
 # apply PCA transformation
 X_train_pca = pca.transform(X_train)
 X_test_pca = pca.transform(X_test)
 
-X_inv_proj = pca.inverse_transform(X_train_pca)
-X_proj_img = np.reshape(X_inv_proj,(len(X_train),48,48))
-
-# #Setup a figure 8 inches by 8 inches
-fig = plt.figure(figsize=(6,6))
-fig.subplots_adjust(left=0, right=1, bottom=0, top=1, hspace=0.05, wspace=0.05)
-# plot the faces, each image is 64 by 64 dimension but 8x8 pixels
-for i in range(64):
-    ax = fig.add_subplot(8, 8, i+1, xticks=[], yticks=[])
-    ax.imshow(imgs[i], cmap=plt.cm.bone, interpolation='nearest')
-
-#Setup a figure 8 inches by 8 inches
-fig = plt.figure(figsize=(6,6))
-fig.subplots_adjust(left=0, right=1, bottom=0, top=1, hspace=0.05, wspace=0.05)
-# plot the faces, each image is 64 by 64 dimension but 8x8 pixels
-for i in range(64):
-    ax = fig.add_subplot(8, 8, i+1, xticks=[], yticks=[])
-    ax.imshow(X_proj_img[i], cmap=plt.cm.bone, interpolation='nearest')
-
-# reshape reduced dataset for kmeans
-nsamples, nx, ny = X_proj_img.shape
-d2_X_proj = X_proj_img.reshape(nsamples, nx*ny)
-
 kmeans = KMeans(n_clusters=n, random_state=0)
-clusters = kmeans.fit_predict(d2_X_proj)
-
-# print("Cluster faces post-PCA")
-fig, ax = plt.subplots(1, n, figsize=(8, 3))
-centers = kmeans.cluster_centers_.reshape(n, 48, 48)
-for axi, center in zip(ax.flat, centers):
-    axi.set(xticks=[], yticks=[])
-    axi.imshow(center, interpolation='nearest', cmap=plt.cm.binary)
+clusters = kmeans.fit_predict(trn)
 
 labels = np.zeros_like(clusters)
 mask = (clusters == 0 )
@@ -144,9 +153,10 @@ labels = np.array(labels, str)
 results=accuracy_score(y_train, labels)
 print(results)
 
+
 # train a neural network
 print("Fitting the classifier to the training set")
-clf = MLPClassifier(hidden_layer_sizes=(1024,), batch_size=256, verbose=True, early_stopping=True).fit(X_train_pca, y_train)
+clf = MLPClassifier(hidden_layer_sizes=(1000,), batch_size=256, verbose=True, early_stopping=True).fit(X_train_pca, y_train)
 
 y_pred = clf.predict(X_test_pca)
 target_names = list(map(str, range(7)))

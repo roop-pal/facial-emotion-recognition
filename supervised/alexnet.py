@@ -1,138 +1,180 @@
-# Copyright 2016 The TensorFlow Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-"""Contains a model definition for AlexNet.
-
-This work was first described in:
-  ImageNet Classification with Deep Convolutional Neural Networks
-  Alex Krizhevsky, Ilya Sutskever and Geoffrey E. Hinton
-
-and later refined in:
-  One weird trick for parallelizing convolutional neural networks
-  Alex Krizhevsky, 2014
-
-Here we provide the implementation proposed in "One weird trick" and not
-"ImageNet Classification", as per the paper, the LRN layers have been removed.
-
-Usage:
-  with slim.arg_scope(alexnet.alexnet_v2_arg_scope()):
-    outputs, end_points = alexnet.alexnet_v2(inputs)
-
-@@alexnet_v2
-"""
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import tensorflow as tf
+import numpy as np
 
-slim = tf.contrib.slim
-trunc_normal = lambda stddev: tf.truncated_normal_initializer(0.0, stddev)
+def alexnet_layer(tensor_in, n_filters, filter_shape, pool_size, activation=tf.nn.tanh,
+                  padding='VALID', norm_depth_radius=4, dropout=None):
+    conv = learn.ops.conv2d(tensor_in,
+                            n_filters=n_filters,
+                            filter_shape=filter_shape,
+                            activation=activation,
+                            padding=padding)
+    pool = tf.nn.max_pool(conv, ksize=pool_size, strides=pool_size, padding=padding)
+    norm = tf.nn.lrn(pool, depth_radius=norm_depth_radius, alpha=0.001 / 9.0, beta=0.75)
+    if dropout:
+        norm = learn.ops.dropout(norm, dropout)
+    return norm
 
 
-def alexnet_v2_arg_scope(weight_decay=0.0005):
-  with slim.arg_scope([slim.conv2d, slim.fully_connected],
-                      activation_fn=tf.nn.relu,
-                      biases_initializer=tf.constant_initializer(0.1),
-                      weights_regularizer=slim.l2_regularizer(weight_decay)):
-    with slim.arg_scope([slim.conv2d], padding='SAME'):
-      with slim.arg_scope([slim.max_pool2d], padding='VALID') as arg_sc:
-        return arg_sc
+def alex_conv_pool_layer(tensor_in, n_filters, kernel_size, stride, pool_size, pool_stride,
+                         activation_fn=tf.nn.tanh, padding='SAME'):
+    conv = tf.contrib.layers.convolution2d(tensor_in,
+                                           num_outputs=n_filters,
+                                           kernel_size=kernel_size,
+                                           stride=stride,
+                                           activation_fn=activation_fn,
+                                           padding=padding)
+    pool = tf.nn.max_pool(conv, ksize=pool_size, strides=pool_stride, padding=padding)
+    return pool
 
 
-def alexnet_v2(inputs,
-               num_classes=7,
-               is_training=True,
-               dropout_keep_prob=0.5,
-               spatial_squeeze=True,
-               scope='alexnet_v2',
-               global_pool=False):
-  """AlexNet version 2.
+def alex_3_convs_pool_layer(tensor_in, activation_fn=tf.nn.tanh, padding='SAME'):
+    conv = tf.contrib.layers.convolution2d(tensor_in,
+                                           num_outputs=384,
+                                           kernel_size=[3, 3],
+                                           stride=1,
+                                           activation_fn=activation_fn,
+                                           padding=padding)
+    conv = tf.contrib.layers.convolution2d(conv,
+                                           num_outputs=384,
+                                           kernel_size=[3, 3],
+                                           stride=1,
+                                           activation_fn=activation_fn,
+                                           padding=padding)
+    conv = tf.contrib.layers.convolution2d(conv,
+                                           num_outputs=256,
+                                           kernel_size=[3, 3],
+                                           stride=1,
+                                           activation_fn=activation_fn,
+                                           padding=padding)
+    pool = tf.nn.max_pool(conv, ksize=(1, 3, 3, 1), strides=(1, 2, 2, 1), padding=padding)
+    return pool
 
-  Described in: http://arxiv.org/pdf/1404.5997v2.pdf
-  Parameters from:
-  github.com/akrizhevsky/cuda-convnet2/blob/master/layers/
-  layers-imagenet-1gpu.cfg
+def flatten_convolution(tensor_in):
+    tendor_in_shape = tensor_in.get_shape()
+    tensor_in_flat = tf.reshape(tensor_in, [tendor_in_shape[0].value or -1, np.prod(tendor_in_shape[1:]).value])
+    return tensor_in_flat
 
-  Note: All the fully_connected layers have been transformed to conv2d layers.
-        To use in classification mode, resize input to 224x224 or set
-        global_pool=True. To use in fully convolutional mode, set
-        spatial_squeeze to false.
-        The LRN layers have been removed and change the initializers from
-        random_normal_initializer to xavier_initializer.
+def dense_layer(tensor_in, layers, activation_fn=tf.nn.tanh, keep_prob=None):
+    if not keep_prob:
+        return tf.contrib.layers.stack(
+            tensor_in, tf.contrib.layers.fully_connected, layers, activation_fn=activation_fn)
 
-  Args:
-    inputs: a tensor of size [batch_size, height, width, channels].
-    num_classes: the number of predicted classes. If 0 or None, the logits layer
-    is omitted and the input features to the logits layer are returned instead.
-    is_training: whether or not the model is being trained.
-    dropout_keep_prob: the probability that activations are kept in the dropout
-      layers during training.
-    spatial_squeeze: whether or not should squeeze the spatial dimensions of the
-      logits. Useful to remove unnecessary dimensions for classification.
-    scope: Optional scope for the variables.
-    global_pool: Optional boolean flag. If True, the input to the classification
-      layer is avgpooled to size 1x1, for any input size. (This is not part
-      of the original AlexNet.)
+    tensor_out = tensor_in
+    for layer in layers:
+        tensor_out = tf.contrib.layers.fully_connected(tensor_out, layer,
+                                                       activation_fn=activation_fn)
+        tensor_out = tf.contrib.layers.dropout(tensor_out, keep_prob=keep_prob)
 
-  Returns:
-    net: the output of the logits layer (if num_classes is a non-zero integer),
-      or the non-dropped-out input to the logits layer (if num_classes is 0
-      or None).
-    end_points: a dict of tensors with intermediate activations.
-  """
-  with tf.variable_scope(scope, 'alexnet_v2', [inputs]) as sc:
-    end_points_collection = sc.original_name_scope + '_end_points'
-    # Collect outputs for conv2d, fully_connected and max_pool2d.
-    with slim.arg_scope([slim.conv2d, slim.fully_connected, slim.max_pool2d],
-                        outputs_collections=[end_points_collection]):
-      net = slim.conv2d(inputs, 64, [11, 11], 4, padding='VALID',
-                        scope='conv1')
-      net = slim.max_pool2d(net, [3, 3], 2, scope='pool1')
-      net = slim.conv2d(net, 192, [5, 5], scope='conv2')
-      net = slim.max_pool2d(net, [3, 3], 2, scope='pool2')
-      net = slim.conv2d(net, 384, [3, 3], scope='conv3')
-      net = slim.conv2d(net, 384, [3, 3], scope='conv4')
-      net = slim.conv2d(net, 256, [3, 3], scope='conv5')
-      net = slim.max_pool2d(net, [3, 3], 2, scope='pool5')
+    return tensor_out
 
-      # Use conv2d instead of fully_connected layers.
-      with slim.arg_scope([slim.conv2d],
-                          weights_initializer=trunc_normal(0.005),
-                          biases_initializer=tf.constant_initializer(0.1)):
-        net = slim.conv2d(net, 4096, [5, 5], padding='VALID',
-                          scope='fc6')
-        net = slim.dropout(net, dropout_keep_prob, is_training=is_training,
-                           scope='dropout6')
-        net = slim.conv2d(net, 4096, [1, 1], scope='fc7')
-        # Convert end_points_collection into a end_point dict.
-        end_points = slim.utils.convert_collection_to_dict(
-            end_points_collection)
-        if global_pool:
-          net = tf.reduce_mean(net, [1, 2], keep_dims=True, name='global_pool')
-          end_points['global_pool'] = net
-        if num_classes:
-          net = slim.dropout(net, dropout_keep_prob, is_training=is_training,
-                             scope='dropout7')
-          net = slim.conv2d(net, num_classes, [1, 1],
-                            activation_fn=None,
-                            normalizer_fn=None,
-                            biases_initializer=tf.zeros_initializer(),
-                            scope='fc8')
-          if spatial_squeeze:
-            net = tf.squeeze(net, [1, 2], name='fc8/squeezed')
-          end_points[sc.name + '/fc8'] = net
-      return net, end_points
-alexnet_v2.default_image_size = 224
+def alexnet_model(features, labels, mode, params):
+    #X, y, image_size=(-1, IMAGE_SIZE, IMAGE_SIZE, 3)):
+    net = tf.feature_column.input_layer(features, params['feature_columns'])
+    net = tf.reshape(net, (params['batch_size'], 48, 48, 1))
+    
+    with tf.variable_scope('layer1'):
+        layer1 = alex_conv_pool_layer(net, 96, [11, 11], 4, (1, 3, 3, 1), (1, 2, 2, 1))
+
+    with tf.variable_scope('layer2'):
+        layer2 = alex_conv_pool_layer(layer1, 256, [5, 5], 2, (1, 3, 3, 1), (1, 2, 2, 1))
+
+    with tf.variable_scope('layer3'):
+        layer3 = alex_3_convs_pool_layer(layer2)
+        layer3_flat = flatten_convolution(layer3)
+        
+    logits = dense_layer(layer3_flat, [4096, 4096, params['n_classes']], activation_fn=tf.nn.tanh, keep_prob=0.2)
+    
+    # prediction is confidence
+    
+    predicted_classes = tf.argmax(logits, 1)
+    
+    if mode == tf.estimator.ModeKeys.PREDICT:
+        predictions = {
+            'class_ids': predicted_classes[:, tf.newaxis],
+            'probabilities': tf.nn.softmax(logits),
+            'logits': logits,
+        }
+        return tf.estimator.EstimatorSpec(mode, predictions=predictions)
+
+    loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits)    
+    accuracy = tf.metrics.accuracy(labels=labels,
+                                   predictions=predicted_classes,
+                                   name='acc_op')
+    
+    metrics = {'accuracy': accuracy}
+    tf.summary.scalar('accuracy', accuracy[1])
+    
+    if mode == tf.estimator.ModeKeys.EVAL:
+        return tf.estimator.EstimatorSpec(
+            mode, loss=loss, eval_metric_ops=metrics)
+        
+    assert mode == tf.estimator.ModeKeys.TRAIN
+            
+    train_op = tf.contrib.layers.optimize_loss(
+        loss, tf.contrib.framework.get_global_step(), optimizer='Adagrad',
+        learning_rate=0.1)
+    
+    return tf.estimator.EstimatorSpec(mode,loss=loss,train_op=train_op)
+
+
+def my_alexnet(features, labels, mode, params):
+    training = False
+    if mode == tf.estimator.ModeKeys.TRAIN:
+        training = True
+        
+    net = tf.feature_column.input_layer(features, params['feature_columns'])
+    net = tf.reshape(net, (params['batch_size'], 48, 48, 1))
+    conv = tf.contrib.layers.convolution2d(net,
+                                           num_outputs=64,
+                                           kernel_size=[5,5],
+                                           stride=1,
+                                           activation_fn=tf.nn.relu,
+                                           padding='SAME')
+    norm = tf.nn.local_response_normalization(conv)
+    pool = tf.nn.max_pool(norm, ksize=(1,3,3,1), strides=(1,2,2,1), padding='SAME')
+    conv = tf.contrib.layers.convolution2d(pool,
+                                           num_outputs=64,
+                                           kernel_size=[5,5],
+                                           stride=1,
+                                           activation_fn=tf.nn.relu,
+                                           padding='SAME')
+    pool = tf.nn.max_pool(conv, ksize=(1,3,3,1), strides=(1,2,2,1), padding='SAME')
+    conv = tf.contrib.layers.convolution2d(pool,
+                                           num_outputs=128,
+                                           kernel_size=[4,4],
+                                           stride=1,
+                                           activation_fn=tf.nn.relu,
+                                           padding='SAME')
+    conv_flat = flatten_convolution(conv)
+    dropout = tf.contrib.layers.dropout(conv_flat, keep_prob=0.3, is_training=training)
+    net = tf.contrib.layers.fully_connected(dropout, 3072)
+    logits = tf.contrib.layers.fully_connected(net, params['n_classes'])
+    
+    predicted_classes = tf.argmax(logits, 1)
+    
+    if mode == tf.estimator.ModeKeys.PREDICT:
+        predictions = {
+            'class_ids': predicted_classes[:, tf.newaxis],
+            'probabilities': tf.nn.softmax(logits),
+            'logits': logits,
+        }
+        return tf.estimator.EstimatorSpec(mode, predictions=predictions)
+    
+    loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits)    
+    accuracy = tf.metrics.accuracy(labels=labels,
+                                   predictions=predicted_classes,
+                                   name='acc_op')
+    
+    metrics = {'accuracy': accuracy}
+    tf.summary.scalar('accuracy', accuracy[1])
+    
+    if mode == tf.estimator.ModeKeys.EVAL:
+        return tf.estimator.EstimatorSpec(
+            mode, loss=loss, eval_metric_ops=metrics)
+        
+    assert mode == tf.estimator.ModeKeys.TRAIN
+            
+    train_op = tf.contrib.layers.optimize_loss(
+        loss, tf.contrib.framework.get_global_step(), optimizer='Momentum', learning_rate=0.1)
+    
+    return tf.estimator.EstimatorSpec(mode,loss=loss,train_op=train_op)
