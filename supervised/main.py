@@ -87,6 +87,10 @@ def main(argv):
     fer2013.parser('../fer2013.csv')
 
     train_x, train_y, test_x, test_y = fer2013.load_data()
+    # if alexnet, make sure length of sets is divisible by batch_size
+#     train_x, train_y, test_x, test_y = train_x, train_y, test_x, test_y
+    train_x, train_y = train_x[:-(len(train_x) % batch_size)], train_y[:-(len(train_y) % batch_size)]
+    test_x, test_y = test_x[:-(len(test_x) % batch_size)], test_y[:-(len(test_y) % batch_size)]
 
     my_feature_columns = [tf.feature_column.numeric_column(key='img',shape=[48,48,1])]
     # detector = dlib.get_frontal_face_detector()
@@ -110,13 +114,16 @@ def main(argv):
     classifier.train(
         input_fn=lambda:train_input_fn({'img':train_x}, train_y, batch_size),
         steps=steps)
+    t = time() - s
+    
+    s = time()
+    train_result = classifier.evaluate(input_fn=lambda:eval_input_fn({'img':train_x}, train_y, batch_size))
+    print('\nTrain set accuracy: {accuracy:0.3f}'.format(**train_result))
+    eval_result = classifier.evaluate(input_fn=lambda:eval_input_fn({'img':test_x}, test_y, batch_size))
     e = time() - s
     
-    eval_result = classifier.evaluate(input_fn=lambda:eval_input_fn({'img':test_x}, test_y, batch_size))
-    train_result = classifier.evaluate(input_fn=lambda:eval_input_fn({'img':train_x}, train_y, batch_size))
-
-    print('\nTrain set accuracy: {accuracy:0.3f}'.format(**train_result))
     print('Test set accuracy: {accuracy:0.3f}\n'.format(**eval_result))
+    print('Trained in {} seconds\n'.format(round(t,2)))
     print('Evaluated in {} seconds\n'.format(round(e,2)))
 
 if __name__ == '__main__':
