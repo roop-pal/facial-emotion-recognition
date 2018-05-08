@@ -5,10 +5,6 @@ from time import time
 import tensorflow as tf
 import fer2013 
 import sys
-# sys.path.insert(0, '../deterministic')
-# import deterministic_emotion_recognition as der
-# import dlib
-
 
 def train_input_fn(features, labels, batch_size):
     # Convert the inputs to a Dataset.
@@ -88,13 +84,9 @@ def main(argv):
 
     train_x, train_y, test_x, test_y = fer2013.load_data()
     # if alexnet, make sure length of sets is divisible by batch_size
-#     train_x, train_y, test_x, test_y = train_x, train_y, test_x, test_y
-    train_x, train_y = train_x[:-(len(train_x) % batch_size)], train_y[:-(len(train_y) % batch_size)]
     test_x, test_y = test_x[:-(len(test_x) % batch_size)], test_y[:-(len(test_y) % batch_size)]
 
     my_feature_columns = [tf.feature_column.numeric_column(key='img',shape=[48,48,1])]
-    # detector = dlib.get_frontal_face_detector()
-    # faces = detector(image, 1)
     # Build 2 hidden layer DNN with 10, 10 units respectively.
 #     classifier = tf.estimator.DNNClassifier(
 #         feature_columns=my_feature_columns,
