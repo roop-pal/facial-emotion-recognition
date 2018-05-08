@@ -15,8 +15,6 @@ from measured_values import *
 
 
 def main():
-    # initialize constants
-    shape_predictor_file = "shape_predictor_68_face_landmarks.dat"
     dataset_file = "../fer2013/fer2013.csv"
     emotions = ["Anger", "Disgust", "Fear",
                 "Joy", "Sadness", "Surprise", "Neutral"]
@@ -25,6 +23,7 @@ def main():
     csvr = csv.reader(open(dataset_file))
 
     # Get training and test set
+    print("[INFO] loading dataset...")
     rows = [list(row) for row in csvr]
     data = pd.read_csv(dataset_file).values
     training_emotions = [data[i,0] for i in range(len(data)) if data[i,2] == 'Training']
@@ -36,6 +35,8 @@ def main():
     training_images = [i.reshape((48, 48)) for i in training_set]
     test_images = [i.reshape((48, 48)) for i in test_set]
 
+    # load facial landmark predictor
+    shape_predictor_file = "shape_predictor_68_face_landmarks.dat"
     # initialize dlib's face detector and facial landmark predictor
     detector = dlib.get_frontal_face_detector()
     predictor = dlib.shape_predictor(shape_predictor_file)
