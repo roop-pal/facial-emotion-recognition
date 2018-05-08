@@ -123,7 +123,10 @@ def my_alexnet(features, labels, mode, params):
         training = True
         
     net = tf.feature_column.input_layer(features, params['feature_columns'])
-    net = tf.reshape(net, (params['batch_size'], 48, 48, 1))
+    if mode == tf.estimator.ModeKeys.PREDICT:
+        net = tf.reshape(net, (1,48,48,1))
+    else:
+        net = tf.reshape(net, (params['batch_size'], 48, 48, 1))
     conv = tf.contrib.layers.convolution2d(net,
                                            num_outputs=64,
                                            kernel_size=[5,5],

@@ -134,7 +134,6 @@ img_counter = 0
 emotions = ["Anger", "Disgust", "Fear",
 				"Joy", "Sadness", "Surprise", "Neutral"]
 
-
 while True:
 	# get frame, resize it, and convert it to gray
 	frame = vs.read()
@@ -162,14 +161,13 @@ while True:
 
 	# get bounding box of face
 	(x, y, w, h) = face_utils.rect_to_bb(faces)
-	im = frame[ y:y+h , x: x + w ]
+	im = gray[ y:y+h , x: x + w ]
 	im = imutils.resize(im, width=48)
-	print(im.shape)
+	(w1, h1) = im.shape
 
 	u = UnsupervisedClassification()
-	u_score = u.label_image(im)
+	u_score = u.label_image([im])
 
-	print("ANA's SCORE ", u_score)
 	#loop over the (x, y)-coordinates for the facial landmarks
 	# and draw them on the image
 	for (x, y) in landmarks:
@@ -362,11 +360,6 @@ while True:
 		emotion_guess = np.argsort(confidence)[-1]
 
 	cv2.putText(frame, emotions[emotion_guess], (50,70), cv2.FONT_HERSHEY_SIMPLEX, 4, 255)
-
-
-
-
-
 
 	cv2.imshow("Frame", frame)
 

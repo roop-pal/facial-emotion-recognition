@@ -63,7 +63,7 @@ d2_t2_imgs, t2_imgs = vector_to_2d_array(test)
 trn_targets = np.array(trn_targets, str)
 test_targets= np.array(test_targets, str)
 
-print("starting")
+print("Learning Emotions")
 # assign training set and test sets
 X_train, X_test, y_train, y_test = d2_imgs, d2_t2_imgs, trn_targets, test_targets
 
@@ -156,5 +156,4 @@ print("MLP Results", results)
 
 tuple_objects = (clf, X_train, y_train, results)
 # Save tuple to disk
-filename = 'finalized_tuple_model.sav'
-joblib.dump(tuple_objects, open(filename, 'wb'))
+pickle.dump(tuple_objects, open("finalized_tuple_model.pkl", 'wb'))

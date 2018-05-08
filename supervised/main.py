@@ -119,13 +119,20 @@ def main(argv):
 def classify(img):
     classifier = pickle.load(open('model.p','rb'))
     predict_input_fn = tf.estimator.inputs.numpy_input_fn(
-        x={"x": new_samples},
+        x={"img": img},
         num_epochs=1,
         shuffle=False)
     output = list(classifier.predict(input_fn=predict_input_fn))
-    print(output["classes"])
-    return output["classes"]
+    batch_size = 50
+    _,_,test_x,test_y = fer2013.load_data()
+    test_x, test_y = test_x[:-(len(test_x) % batch_size)], test_y[:-(len(test_y) % batch_size)]
+    eval_result = classifier.evaluate(input_fn=lambda:eval_input_fn({'img':test_x},test_y,batch_size))
+    print("\nrsult",eval_result)
+    print(output[0]["class_ids"])
+    return output[0]["class_ids"]
 
 if __name__ == '__main__':
     tf.logging.set_verbosity(tf.logging.INFO)
-    tf.app.run(main)
+    #tf.app.run(main)
+    train_x,train_y,_,_=fer2013.load_data()
+    tf.app.run(classify(train_x[0]))
