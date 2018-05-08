@@ -80,7 +80,7 @@ def main(argv):
     batch_size = 50
     emotions = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
     
-    # fer2013.parser('../fer2013.csv')
+#     fer2013.parser('../fer2013.csv')
 
     train_x, train_y, test_x, test_y = fer2013.load_data()
     # if alexnet, make sure length of sets is divisible by batch_size
@@ -96,7 +96,7 @@ def main(argv):
 #         n_classes=7)
 
     classifier = tf.estimator.Estimator(
-        model_fn=alexnet.alexnet_model,
+        model_fn=alexnet.my_alexnet,
         params={
             'feature_columns': my_feature_columns,
             'batch_size':batch_size,
