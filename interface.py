@@ -162,12 +162,12 @@ while True:
 
 	# get bounding box of face
 	(x, y, w, h) = face_utils.rect_to_bb(faces)
-	im = frame[ y:y+h , x: x + w ]
+	im = gray[ y:y+h , x: x + w ]
 	im = imutils.resize(im, width=48)
 	print(im.shape)
 
 	u = UnsupervisedClassification()
-	u_score = u.label_image(im)
+	u_score = u.label_image([im])
 
 	print("ANA's SCORE ", u_score)
 	#loop over the (x, y)-coordinates for the facial landmarks
