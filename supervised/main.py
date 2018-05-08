@@ -9,11 +9,39 @@ import sys
 # import deterministic_emotion_recognition as der
 # import dlib
 
+
+def train_input_fn(features, labels, batch_size):
+    # Convert the inputs to a Dataset.
+    dataset = tf.data.Dataset.from_tensor_slices((dict(features), labels))
+
+    # Shuffle, repeat, and batch the examples.
+    return dataset.shuffle(1000).repeat().batch(batch_size)
+
+def eval_input_fn(features, labels, batch_size):
+    """An input function for evaluation or prediction"""
+    features=dict(features)
+    if labels is None:
+        # No labels, use only features.
+        inputs = features
+    else:
+        inputs = (features, labels)
+
+    # Convert the inputs to a Dataset.
+    dataset = tf.data.Dataset.from_tensor_slices(inputs)
+
+    # Batch the examples
+    assert batch_size is not None, "batch_size must not be None"
+    dataset = dataset.batch(batch_size)
+
+    # Return the dataset.
+    return dataset
+
 def my_model(features, labels, mode, params):
     """DNN with three hidden layers, and dropout of 0.1 probability."""
     # Create three fully connected layers each layer having a dropout
     # probability of 0.1.
     net = tf.feature_column.input_layer(features, params['feature_columns'])
+    
     for units in params['hidden_units']:
         net = tf.layers.dense(net, units=units, activation=tf.nn.relu)
 
@@ -51,34 +79,8 @@ def my_model(features, labels, mode, params):
     train_op = optimizer.minimize(loss, global_step=tf.train.get_global_step())
     return tf.estimator.EstimatorSpec(mode, loss=loss, train_op=train_op)
 
-def train_input_fn(features, labels, batch_size):
-    # Convert the inputs to a Dataset.
-    dataset = tf.data.Dataset.from_tensor_slices((dict(features), labels))
-
-    # Shuffle, repeat, and batch the examples.
-    return dataset.shuffle(1000).repeat().batch(batch_size)
-
-def eval_input_fn(features, labels, batch_size):
-    """An input function for evaluation or prediction"""
-    features=dict(features)
-    if labels is None:
-        # No labels, use only features.
-        inputs = features
-    else:
-        inputs = (features, labels)
-
-    # Convert the inputs to a Dataset.
-    dataset = tf.data.Dataset.from_tensor_slices(inputs)
-
-    # Batch the examples
-    assert batch_size is not None, "batch_size must not be None"
-    dataset = dataset.batch(batch_size)
-
-    # Return the dataset.
-    return dataset
-
 def main(argv):
-    steps = 100
+    steps = 1
     batch_size = 19
     emotions = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
     
@@ -97,11 +99,10 @@ def main(argv):
 #         n_classes=7)
 
     classifier = tf.estimator.Estimator(
-        model_fn=my_model,
+        model_fn=alexnet.alexnet_model,
         params={
             'feature_columns': my_feature_columns,
-            # Two hidden layers of 10 nodes each.
-            'hidden_units': [10, 10],
+            'batch_size':batch_size,
             'n_classes': 7,
         })
 
@@ -121,4 +122,3 @@ def main(argv):
 if __name__ == '__main__':
     tf.logging.set_verbosity(tf.logging.INFO)
     tf.app.run(main)
-    
